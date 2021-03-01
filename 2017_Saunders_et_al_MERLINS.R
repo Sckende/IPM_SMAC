@@ -222,9 +222,9 @@ sink()
 
 #################################################################################
 # Load packages---------------------------------------------------------------------
-#library(R2WinBUGS)
+library(R2WinBUGS)
 #library(rjags)
-library(jagsUI)
+#library(jagsUI)
 #library(lme4)
 # Load data---------------------------------------------------------------------
 
@@ -235,15 +235,32 @@ hawk <- c(M$HM)           #  Hawk Mountain counts
 white <- c(M$WP)          #  Whitefish Point counts
 mat <- matrix(c(hawk, white), nrow=length(hawk))
 
-# !!! Doivent aussi être défini au minimum
-# marray.j
-# marray.a
+# CMR - Banded as juvenile
+marray.j <- read.table("PIPL_asJUV_CMR.txt", header = F)
+marray.j <- as.matrix(marray.j,
+                      ncol = 24)
+
+# CMR - Banded as adult
+marray.a <- read.table("PIPL_asADULT_CMR.txt", header = F)
+marray.a <- as.matrix(marray.a,
+                      ncol = 24)
+# **** Matrices need to be formatted for analyses - cf examples in Bayesian Population analyses  **** 
+
+# Population count data
+y <- read.table("PIPL_count.txt", h = T)
+y <- as.vector(y[,2])
+
+# Productivity data
+prod <- read.table("PIPL_fecundity.txt", h = T)
+J <- prod$FLEDGE # Number of offspring
+R <- prod$SURV_BROOD # Number of surveyed broods
 #-------------------------------------------------------------------------------
+# Localization of WinBUGS.exe
+bugs.dir <- "C:/Users/Etudiant/Documents/WinBUGS14/"
 
 # Bundle data
 K <- 10                           # Number of years with predictions
 nyears <- ncol(marray.j) # Number of study years
-nyears <- nrow(M)# Number of study years
 N.mean = 114.9                    # Mean estimate of merlin population size
 N.sd = 17.3                       # SD of merlin population size
 
@@ -261,7 +278,8 @@ jags.data <- list(nyears = nyears,
                   R = R,
                   r.j = rowSums(marray.j),
                   r.a = rowSums(marray.a),
-                  K = K, x = log(mat.proj),
+                  K = K,
+                  x = log(mat.proj),
                   T = nrow(mat.proj),
                   S = ncol(mat.proj),
                   N.mean = N.mean,
@@ -285,7 +303,8 @@ inits <- function(){
          sigma.proc = runif(1, 0, 1),
          mean.r = rnorm(1),
          sigma.obs = runif(1, 0, 1),
-         logN.est = c(rnorm(1, 4.4, 0.1),rep(NA, (nrow(mat.proj) - 1))))
+         logN.est = c(rnorm(1, 4.4, 0.1),
+                      rep(NA, (nrow(mat.proj) - 1))))
     }
 
 # Parameters monitored
@@ -327,7 +346,7 @@ nb <- 200000
 nc <- 3
 
 # Call JAGS from R (jagsUI)
-ipm.pva <- jags(jags.data,
+ipm.pva <- jagsUI::jags(jags.data,
                 inits,
                 parameters,
                 "ipm.pva.jags",
@@ -335,5 +354,6 @@ ipm.pva <- jags(jags.data,
                 n.thin = nt,
                 n.iter = ni,
                 n.burnin = nb,
-                parallel=TRUE,
-                store.data=TRUE)
+                parallel=FALSE,
+                store.data=TRUE,
+                bugs.format = TRUE)

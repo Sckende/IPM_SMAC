@@ -2,7 +2,7 @@
 #IPM for Emperor penguins
 # M5: {phij(sam), phia(.), f(t), p(t)}
 # Pre breeding matrix population model with 6 age classes (1,2,3,4,5 5+(ad))
-# SAM is clacluated for the rearing period (JULY-DEC)
+# SAM is calculated for the rearing period (JULY-DEC)
 #**************************************************************
 #**********************************************
 # Set working directory
