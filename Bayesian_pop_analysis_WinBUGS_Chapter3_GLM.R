@@ -46,7 +46,7 @@ summary(fm <- lm(Y ~ A-1 + X))
 # To obtain the values of the linear predictor or expected or "typical" response of this kind of model
 model.matrix(~A-1+X) %*% fm$coef
 
-### Generation and analysis of simulated data with Poisson GLM
+#### Generation and analysis of simulated data with Poisson GLM ####
 # Definition of  a function that generates Poisson counts of peregrine falcons
 # During n years
 # Inspired by Monneret, 2006
@@ -121,7 +121,7 @@ beta1 ~ dunif(-10, 10)
 beta2 ~ dunif(-10, 10)
 beta3 ~ dunif(-10, 10)
 
-# Likelihood: Note key components of a GLM on one line each
+# Likelihood: Note key components of a GLM on one line (of dataset) each
 for( i in 1:n){
   C[i] ~ dpois(lambda[i])   # 1. Distribution for random part
   log(lambda[i]) <- log.lambda[i]   # 2. Link function
@@ -210,3 +210,144 @@ lines(1:40,
       lwd = 3,
       col = "blue",
       lty = 2)
+
+#### Analysis of real data ####
+# data : trajectory of the peregrine population breeding in the French Jura from 1964 to 2003
+# assumption that the survey coverage and detection probability of peregrine pairs in the French Jura have not changed in a sustained way over time
+
+# Read data
+peregrine <- read.table("DATA/falcons.txt", header = T)
+attach(peregrine)
+# count of adult pairs - Pairs
+# reproductive pairs - R.Pairs
+# fledged young - Eyasses
+# 40 years
+
+# Data explo
+plot(Year,
+     Pairs,
+     type = "b",
+     lwd = 2,
+     main = "",
+     las = 1,
+     xlab = "Years",
+     ylim = c(0, max(c(Pairs, R.Pairs, Eyasses))),
+     bty = "n")
+lines(Year,
+      R.Pairs,
+      type = "b",
+      lwd = 2,
+      main = "",
+      las = 1,
+      col = "blue")
+lines(Year,
+      Eyasses,
+      type = "b",
+      lwd = 2,
+      main = "",
+      las = 1,
+      col = "red")
+
+legend("topleft",
+       pch =20,
+       legend = c("Eyasses", "Pairs", "R.Pairs"),
+       col = c("red", "black", "blue"),
+       bty = "n")
+
+# ----- Analysing with frequentist framework
+fm <- glm(Pairs ~ Year + I(Year^2) + I(Year^3))
+summary(fm)
+
+R.predictions <- predict(fm, type = "response")
+
+# ----- Analysing with Bayesian framework & BUGS
+
+# Specify model in BUGS language
+sink("Peregrine_Pois_GLM.txt")
+cat("
+    model{
+    # Priors
+    alpha ~ dunif(-20, 20)
+    beta1 ~ dunif(-10, 10)
+    beta2 ~ dunif(-10, 10)
+    beta3 ~ dunif(-10, 10)
+    
+    # Likelihood: Note key components of a GLM on one line each
+    for(i in 1:n){
+    data[i] ~ dpois(lambda[i])    # 1. Distribution for random part
+    log(lambda[i]) <- log.lambda[i]   # 2. Link function
+    log.lambda[i] <- alpha + beta1*Year[i] + beta2*pow(Year[i], 2) + beta3*pow(Year[i], 3)    # 3. Linear predictor
+    } # i
+    
+    
+    
+    }
+    ", fill = TRUE)
+sink()
+
+# Localization of WinBUGS.exe
+bugs.dir <- "C:/Users/Etudiant/Documents/WinBUGS14/"
+
+# Bundle into an R list the (standardized) data needed for the analysis by WinBUGS
+mean.year <- mean(Year)
+sd.year <- sd(Year)
+
+# Good to compare the efficiency of R for the data fit !
+data <- Pairs
+data <- R.Pairs
+data <- Eyasses
+
+win.data <- list(data = data,
+                 n = length(Pairs),
+                 Year = (Year - mean.year) / sd.year)
+
+# Initials values - see comments in page 59
+inits <- function(){
+  list(alpha = runif(1, -2, 2),
+       beta1 = runif(1, -3, 3))
+}
+
+# List of quantities we want to estimate - Parameters monitored
+params <- c("alpha", "beta1", "beta2", "beta3", "lambda")
+
+# MCMC characteristics
+ni <- 2000
+nt <- 2
+nb <- 1000
+nc <- 3
+
+# Call WinBUGS from R
+#require(R2WinBUGS)
+out <- R2WinBUGS::bugs(data = win.data,
+                       inits = inits,
+                       parameters.to.save = params,
+                       model.file = "Peregrine_Pois_GLM.txt",
+                       n.chains = nc,
+                       n.thin = nt,
+                       n.iter = ni,
+                       n.burnin = nb,
+                       debug = F, # WinBUGS then remains open after the requested number of iterations has been produced, and we can visually inspect whether the chains have converged, or in the case of an error, directly read the log file
+                       bugs.directory = bugs.dir,
+                       working.directory = getwd())
+# Summarize posteriors
+print(out, digit = 3)
+#plot(out)
+WinB.predictions <- out$mean$lambda
+
+# Comparison btween raw data, frequ. pred. and Bay. pred.
+x11()
+plot(Year,
+     data,
+     type = "b",
+     lwd = 2,
+     bty ="n",
+     xlab = "Year",
+     ylim = c(0, max(c(data, R.predictions, WinB.predictions))+10))
+lines(Year,
+      R.predictions,
+      col = "blue",
+      lwd = 2)
+lines(Year,
+      WinB.predictions,
+      col = "red",
+      lwd = 2)
