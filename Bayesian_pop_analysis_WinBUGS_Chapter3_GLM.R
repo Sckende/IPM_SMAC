@@ -334,7 +334,7 @@ print(out, digit = 3)
 #plot(out)
 WinB.predictions <- out$mean$lambda
 
-# Comparison btween raw data, frequ. pred. and Bay. pred.
+# Comparison between raw data, frequentist predictions and Bayesian pred
 x11()
 plot(Year,
      data,
